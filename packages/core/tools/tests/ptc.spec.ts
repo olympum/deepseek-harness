@@ -104,13 +104,16 @@ function fakeAgent(): { agent: Agent; events: { type: string; data: unknown }[] 
 async function runCode(
   ctx: Context,
   code: string,
-  extras: { agent?: Agent; signal?: AbortSignal; description?: string } = {},
+  extras: { agent?: Agent; signal?: AbortSignal; description?: string; omitDescription?: boolean } = {},
 ): Promise<ToolExecutionResult> {
   return ctx.tools.execute({
     signal: testToolSignal,
     callId: ToolCallId('call-1'),
     name: RUN_CODE_NAME,
-    arguments: { code, description: extras.description ?? 'Run the test program' },
+    arguments: {
+      code,
+      ...extras.omitDescription ? {} : { description: extras.description ?? 'Run the test program' },
+    },
     ...extras.agent ? { agent: extras.agent } : {},
     ...extras.signal ? { signal: extras.signal } : {},
   })
@@ -1326,6 +1329,19 @@ describe('the run_code dispatch bridge', () => {
     const result = await runCode(ctx, 'return 1', { description: '   ' })
     expect(result.isError).toBe(true)
     expect((result.content[0] as { text: string }).text).toContain('invalid description')
+  })
+
+  it('executes and presents when the optional description is omitted', async () => {
+    const { ctx, runtime } = await setup({ mode: 'ptc' })
+    runtime.behavior = () => Promise.resolve({ logs: [], value: 'ok' })
+
+    const result = await runCode(ctx, 'return 1', { omitDescription: true })
+    expect(result.isError).toBe(false)
+    expect(result.content).toEqual([{ type: 'text', text: 'ok' }])
+    expect(ctx.tools.get(RUN_CODE_NAME)?.presentCall?.({ code: 'return 1' })).toMatchObject({
+      title: 'Run code',
+      rawInput: 'return 1',
+    })
   })
 
   it.each([

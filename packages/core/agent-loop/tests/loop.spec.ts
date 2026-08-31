@@ -225,6 +225,38 @@ describe('agent loop', () => {
     expect(messages[1]!.content).toEqual([{ type: 'text', text: 'hello there' }])
   })
 
+  it('retries one text-encoded tool call and omits the failed attempt from history', async () => {
+    const malformed = '<tool_call><arg_key>name</arg_key><arg_value>bash</arg_value></tool_call>'
+    const adapter = new MockAdapter([textResponse(malformed), textResponse('recovered')])
+    const ctx = await harness(adapter)
+    const agent = ctx.agentLoop.create(SessionId('text-tool-retry'), { provider: 'mock', model: 'mock' })
+
+    send(agent, 'recover the malformed call')
+    await waitForIdle(ctx, agent)
+
+    expect(adapter.requests).toHaveLength(2)
+    expect(agent.session.events.filter(event => event.type === 'assistant/message')).toHaveLength(1)
+    const messages = agent.session.deriveMessages()
+    expect(messages.at(-1)?.content).toEqual([{ type: 'text', text: 'recovered' }])
+  })
+
+  it('fails after the second text-encoded tool call in one step', async () => {
+    const malformed = '<tool_call><arg_key>name</arg_key><arg_value>bash</arg_value></tool_call>'
+    const adapter = new MockAdapter([textResponse(malformed), textResponse(malformed)])
+    const ctx = await harness(adapter)
+    const agent = ctx.agentLoop.create(SessionId('text-tool-retry-exhausted'), { provider: 'mock', model: 'mock' })
+
+    send(agent, 'repeat the malformed call')
+    await waitForIdle(ctx, agent)
+
+    expect(adapter.requests).toHaveLength(2)
+    expect(agent.session.events.filter(event => event.type === 'assistant/message')).toHaveLength(0)
+    expect(agent.session.events.find(event => event.type === 'turn/end')).toMatchObject({
+      type: 'turn/end',
+      data: { reason: { kind: 'error', error: { message: 'agent-loop: model emitted a text-encoded native tool call twice' } } },
+    })
+  })
+
   it('round-trips tool calls: model requests tool → executes → result in next request', async () => {
     const adapter = new MockAdapter([
       toolCallResponse('c1', 'echo', { text: 'ping' }, 'calling echo'),

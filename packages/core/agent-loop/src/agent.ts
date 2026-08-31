@@ -344,6 +344,7 @@ export class ReactLoopAgent implements Agent {
     const { turn, step, abort: { signal } } = this.phase
     signal.throwIfAborted()
     const system = renderPrompt(assembly)
+    let malformedToolCallRetries = 0
 
     while (true) {
       const surfaceGeneration = this.session.surface.replaceGeneration
@@ -415,6 +416,22 @@ export class ReactLoopAgent implements Agent {
           ...assembler.replayState !== undefined ? { replayState: assembler.replayState } : {},
         },
       })
+      const malformedToolText = message.content
+        .filter(block => block.type === 'text')
+        .map(block => block.text)
+        .join('')
+      const malformedToolCall = malformedToolText.includes('</tool_call>')
+        && (malformedToolText.includes('<tool_call>')
+          || malformedToolText.includes('<arg_key>')
+          || malformedToolText.includes('</arg_key>')
+          || malformedToolText.includes('<arg_value>'))
+      if (malformedToolCall) {
+        if (malformedToolCallRetries < 1) {
+          malformedToolCallRetries += 1
+          continue
+        }
+        throw new Error('agent-loop: model emitted a text-encoded native tool call twice')
+      }
       this.session.append(
         'assistant/message',
         {

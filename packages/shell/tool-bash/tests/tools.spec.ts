@@ -332,7 +332,6 @@ describe('bash tool', () => {
   it.each([
     [{}, /missing required property "command"/],
     [{ command: 42, description: 'd' }, /"command" must be a string/],
-    [{ command: 'x' }, /missing required property "description"/],
     [{ command: 'x', description: 7 }, /"description" must be a string/],
     [{ command: 'x', description: 'd', timeoutMs: 'soon' }, /"timeoutMs" must be a number/],
     [{ command: 'x', description: 'd', workdir: 7 }, /"workdir" must be a string/],
@@ -372,7 +371,7 @@ describe('bash tool', () => {
     const bashSchema = schemas[0]!
     expect(bashSchema.parameters).toMatchObject({
       type: 'object',
-      required: ['command', 'description'],
+      required: ['command'],
     })
     expect(Object.keys(bashSchema.parameters.properties as Record<string, unknown>))
       .toContain('run_in_background')
@@ -1054,11 +1053,14 @@ describe('tool-owned UI presentation (presentCall / presentResult)', () => {
     })).toBeUndefined()
   })
 
-  it('presentCall validates softly: malformed args (missing required description) return undefined, never throw', async () => {
+  it('executes and presents when the optional description is omitted', async () => {
     const ctx = await setup()
-    // `defineTool` soft-validates replayed logged args before presentation. Invalid shapes return
-    // undefined for generic UI rendering rather than throwing; `presentCall` accepts `unknown`.
-    expect(ctx.tools.get('bash')?.presentCall?.({ command: 'ls' })).toBeUndefined()
+    const result = await call(ctx, 'bash', { command: 'printf ok' })
+    expect(result.isError).toBe(false)
+    expect(text(result)).toContain('ok')
+    expect(ctx.tools.get('bash')?.presentCall?.({ command: 'printf ok' })).toMatchObject({
+      description: 'Run bash command',
+    })
   })
 })
 
