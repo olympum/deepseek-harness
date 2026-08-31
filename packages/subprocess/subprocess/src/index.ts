@@ -9,6 +9,8 @@
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
+import { homedir } from 'node:os'
+import { delimiter, join } from 'node:path'
 import { DSH_ENV_PREFIX } from './types.ts'
 import type { SubprocessHandle, SubprocessSpawnSpec } from './types.ts'
 import type { SubprocessTerminalHandle, SubprocessTerminalSpawnSpec } from './types.ts'
@@ -57,11 +59,31 @@ export const SENSITIVE_ENV_PATTERN = /KEY|PASSWORD|SECRET|TOKEN/i
  * transports) share the one scrub definition.
  * @returns a fresh environment object safe to hand to a child spawn.
  */
+const STANDARD_USER_TOOL_PATHS = [join(homedir(), '.cargo', 'bin'), join(homedir(), '.local', 'bin')]
+const STANDARD_HOST_TOOL_PATHS = process.platform === 'darwin'
+  ? ['/opt/homebrew/bin', '/opt/homebrew/sbin', '/usr/local/bin', '/usr/local/sbin']
+  : process.platform === 'win32' ? [] : ['/usr/local/bin', '/usr/local/sbin']
+
+function effectiveChildPath(): string {
+  const inheritedPath = Object.entries(process.env).find(([key]) => key.toUpperCase() === 'PATH')?.[1] ?? ''
+  const entries = inheritedPath.split(delimiter).filter(entry => entry.length > 0)
+  for (const entry of [...STANDARD_USER_TOOL_PATHS, ...STANDARD_HOST_TOOL_PATHS]) {
+    if (!entries.includes(entry)) entries.push(entry)
+  }
+  return entries.join(delimiter)
+}
+
+/**
+ * Return a scrubbed child environment with conventional user and host tool PATH entries.
+ * @returns scrubbed environment variables and effective executable search path.
+ */
 export function scrubbedParentEnv(): Record<string, string> {
   const env: Record<string, string> = {}
   for (const [key, value] of Object.entries(process.env)) {
     if (value !== undefined && !SENSITIVE_ENV_PATTERN.test(key) && !key.toUpperCase().startsWith(DSH_ENV_PREFIX)) env[key] = value
   }
+  const pathKey = Object.keys(env).find(key => key.toUpperCase() === 'PATH') ?? (process.platform === 'win32' ? 'Path' : 'PATH')
+  env[pathKey] = effectiveChildPath()
   return env
 }
 

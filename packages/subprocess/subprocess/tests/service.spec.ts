@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { homedir } from 'node:os'
+import { delimiter, join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { Context } from '@deepseek-ai/cordis'
 import { scrubbedParentEnv, SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
@@ -95,6 +97,19 @@ describe('SubprocessRuntime seam', () => {
       delete process.env.SCRUB_PROBE_TOKEN
       delete process.env.SCRUB_PROBE_PASSWORD
       delete process.env.SCRUB_PROBE_PLAIN
+    }
+  })
+
+  it('adds the Cargo bin to a sparse launchd PATH', () => {
+    const originalPath = process.env.PATH
+    process.env.PATH = '/usr/bin:/bin'
+    try {
+      const env = scrubbedParentEnv()
+      const path = Object.entries(env).find(([key]) => key.toUpperCase() === 'PATH')?.[1]
+      expect(path?.split(delimiter)).toContain(join(homedir(), '.cargo', 'bin'))
+    } finally {
+      if (originalPath === undefined) delete process.env.PATH
+      else process.env.PATH = originalPath
     }
   })
 })
