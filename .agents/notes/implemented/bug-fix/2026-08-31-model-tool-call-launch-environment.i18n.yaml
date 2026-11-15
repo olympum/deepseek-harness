@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-31-model-tool-call-launch-environment.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-31-model-tool-call-launch-environment.md
-2026-08-31-model-tool-call-launch-environment.md: d8b2ea30421c9b260b3af45190b15e61343ba4f2
-2026-08-31-model-tool-call-launch-environment.zh.md: 488732a8b8db65b3d73c30837cdec81d693c54cc
+/agent-note-model-tool-call-and-launch-environment-resilience:
+  en: f35bc8dd02161f0c
+  zh: f6079a65c19f3716
+/agent-note-model-tool-call-and-launch-environment-resilience/problem:
+  en: 5ffa279b68da04d7
+  zh: 0c2b73ff73c162e9
+/agent-note-model-tool-call-and-launch-environment-resilience/decision:
+  en: 52ae4fcad0506b29
+  zh: 2011d811b107adda
+/agent-note-model-tool-call-and-launch-environment-resilience/verification:
+  en: 0d022e41a9cc13af
+  zh: f1606ccf46f650bd
+/agent-note-model-tool-call-and-launch-environment-resilience/alternatives-considered:
+  en: f2ff6dd3e71d389b
+  zh: 71f6aca431ff04ba
+/agent-note-model-tool-call-and-launch-environment-resilience/consequences:
+  en: 332b574a721b7061
+  zh: 5db1b572ce3ff4da
