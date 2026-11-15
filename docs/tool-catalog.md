@@ -635,7 +635,7 @@ Execute a TypeScript program against the available tools. Takes one required arg
     },
     "description": {
       "type": "string",
-      "description": "Optional clear, concise description of what this program does (shown in the UI)."
+      "description": "Optional clear, concise description of what this program does in active voice, 5-10 words (shown in the UI). Examples: \"Count TODO markers across packages\"; \"Read failing test and its fixture\"; \"Rename config key in every cordis.yml\"."
     },
     "timeoutMs": {
       "type": "number",
@@ -697,7 +697,7 @@ exit_plan_mode stays in the model-facing schema while planning is inactive so tr
 
 ### `bash`
 
-Execute a bash command (`bash -c`) and return its stdout/stderr. Each call runs in a fresh shell; pass `workdir` instead of using `cd`. Managed `$DSH_*` variables expose current harness environment facts. Long output is truncated to its tail; the full output is saved to a file whose path is reported when available. Before any delete or move, verify that the resolved absolute target path is the intended one; never run it against a computed path you have not checked. An unset variable expands to an empty string, so guard variables in such paths with `${VAR:?}`. Commands may run under a file sandbox; a blocked file operation is reported as `[sandbox: file access denied under <mode> mode]`, a policy denial: do not retry another way.
+Execute a bash command (`bash -c`) and return its stdout/stderr. Each call runs in a fresh shell; pass `workdir` instead of using `cd`. Managed `$DSH_*` variables expose current harness environment facts. Long output is truncated to its tail; the full output is saved to a file whose path is reported when available. Provide `description` before `command` in the arguments when you can; it labels the call in the UI. Before any delete or move, verify that the resolved absolute target path is the intended one; never run it against a computed path you have not checked. An unset variable expands to an empty string, so guard variables in such paths with `${VAR:?}`. Commands may run under a file sandbox; a blocked file operation is reported as `[sandbox: file access denied under <mode> mode]`, a policy denial: do not retry another way.
 
 ```json
 {
@@ -705,7 +705,7 @@ Execute a bash command (`bash -c`) and return its stdout/stderr. Each call runs 
   "properties": {
     "description": {
       "type": "string",
-      "description": "Optional concise description of what this command does (shown in the UI)."
+      "description": "Optional clear, concise description of what this command does in active voice, 5-10 words (shown in the UI). Examples: \"ls\" → \"List files in current directory\"; \"git status\" → \"Show working tree status\"; \"npm install\" → \"Install package dependencies\"."
     },
     "command": {
       "type": "string",

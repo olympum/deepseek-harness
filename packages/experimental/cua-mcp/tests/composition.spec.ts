@@ -198,7 +198,7 @@ describe('Computer Use MCP composition', () => {
     expect(listed.tools[1]).toMatchObject({
       name: registered.name, description: registered.description, inputSchema: { ...schema, properties: served },
     })
-    expect(registered.parameters).toMatchObject({ required: expect.arrayContaining(['code', 'description']) as string[] })
+    expect(registered.parameters).toMatchObject({ required: expect.arrayContaining(['code']) as string[] })
     expect(registered.description.length).toBeGreaterThan(1000)
 
     // The reference is the provider's guidance for the connection Agent, served before any program has run.
@@ -262,10 +262,10 @@ describe('Computer Use MCP composition', () => {
     setTimeout(() => { controller.abort() }, 100)
     await expect(hanging).rejects.toThrow()
     expect(lastJson(await run('inspect(1 + 1)'))).toBe(2)
-    // Argument validation belongs to the DSH executor: a program without the required description is refused there.
-    const invalid = await client.callTool({ name: 'cua_run_code', arguments: { code: '1' } })
+    // Argument validation belongs to the DSH executor: a program without the required code is refused there.
+    const invalid = await client.callTool({ name: 'cua_run_code', arguments: { description: 'label only' } })
     expect(invalid.isError).toBe(true)
-    expect(texts(invalid)).toEqual(['invalid arguments: missing required property "description"'])
+    expect(texts(invalid)).toEqual(['invalid arguments: missing required property "code"'])
   })
 
   it('resets only the program environment: a fresh process and cua object, the same Agent and native connection', async () => {

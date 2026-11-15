@@ -1,5 +1,6 @@
 /** Native browser helper handoff keeps Harness credentials out of the child environment. */
 import { EventEmitter } from 'node:events'
+import { delimiter } from 'node:path'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { PassThrough } from 'node:stream'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -28,7 +29,10 @@ it('scrubs the helper environment and reports spawn or exit failures', async () 
   expect(args?.[2]).toContain('launcher.ref()')
   expect(options?.env).not.toHaveProperty('DEEPSEEK_API_KEY')
   expect(options?.env).not.toHaveProperty('DSH_HOME')
-  expect(options?.env?.PATH).toBe(process.env.PATH)
+  // The scratch environment adds standard tool directories but keeps every inherited PATH entry.
+  expect(options?.env?.PATH?.split(delimiter)).toEqual(expect.arrayContaining(
+    (process.env.PATH ?? '').split(delimiter),
+  ))
   expect(options?.stdio).toEqual(['ignore', 'inherit', 'pipe'])
   completed.emit('close', 0)
   await expect(completion).resolves.toBeUndefined()

@@ -583,14 +583,15 @@ export class ReactLoopAgent implements Agent {
           .map(block => block.text)
           .join('')
         const malformedToolCall = malformedToolText.includes('</tool_call>')
-          && (malformedToolText.includes('<tool_call>')
-            || malformedToolText.includes('<arg_key>')
+          && (malformedToolText.includes('<arg_key>')
             || malformedToolText.includes('</arg_key>')
             || malformedToolText.includes('<arg_value>'))
         if (malformedToolCall) {
           if (malformedToolCallRetries < 1) {
             malformedToolCallRetries += 1
-            live.abandon()
+            live.settle('assistant/attempt', () => this.session.append('assistant/attempt', {
+              turn, step, stream: live.stream,
+            }).seq)
             continue
           }
           throw new Error('agent-loop: model emitted a text-encoded native tool call twice')

@@ -500,8 +500,39 @@ describe('agent loop', () => {
 
     expect(adapter.requests).toHaveLength(2)
     expect(agent.session.snapshotEvents().filter(event => event.type === 'assistant/message')).toHaveLength(1)
+    // The discarded completion is still a durable attempt, so token accounting keeps its usage.
+    expect(agent.session.snapshotEvents().filter(event => event.type === 'assistant/attempt')).toHaveLength(1)
     const messages = agent.session.deriveMessages()
     expect(messages.at(-1)?.content).toEqual([{ type: 'text', text: 'recovered' }])
+  })
+
+  it.each([
+    ['a closing argument key', '</arg_key></tool_call>'],
+    ['an argument value', '<arg_value>bash</arg_value></tool_call>'],
+  ])('recovers a text-encoded call carrying %s', async (_label, malformed) => {
+    const adapter = new MockAdapter([textResponse(malformed), textResponse('recovered')])
+    const ctx = await harness(adapter)
+    const agent = await ctx.agentLoop.create(brandString<SessionId>(`text-tool-${_label}`), { provider: 'mock', model: 'mock' })
+
+    send(agent, 'recover the malformed call')
+    await waitForIdle(ctx, agent)
+
+    expect(adapter.requests).toHaveLength(2)
+    expect(agent.session.snapshotEvents().filter(event => event.type === 'assistant/message')).toHaveLength(1)
+  })
+
+  it('treats a quoted tool-call example without argument tags as ordinary text', async () => {
+    const quoted = 'The syntax is <tool_call>{"name":"bash"}</tool_call>.'
+    const adapter = new MockAdapter([textResponse(quoted)])
+    const ctx = await harness(adapter)
+    const agent = await ctx.agentLoop.create(brandString<SessionId>('quoted-tool-call'), { provider: 'mock', model: 'mock' })
+
+    send(agent, 'show the syntax')
+    await waitForIdle(ctx, agent)
+
+    expect(adapter.requests).toHaveLength(1)
+    expect(agent.session.snapshotEvents().filter(event => event.type === 'assistant/message')).toHaveLength(1)
+    expect(agent.session.deriveMessages().at(-1)?.content).toEqual([{ type: 'text', text: quoted }])
   })
 
   it('fails after the second text-encoded tool call in one step', async () => {

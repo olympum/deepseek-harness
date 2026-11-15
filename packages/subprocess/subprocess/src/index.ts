@@ -88,25 +88,47 @@ export function scrubbedParentEnv(): Record<string, string> {
     if (value === undefined) Reflect.deleteProperty(env, name)
     else env[name] = value
   }
-  const pathKey = Object.keys(env).find(key => key.toUpperCase() === 'PATH') ?? (process.platform === 'win32' ? 'Path' : 'PATH')
+  /* v8 ignore next 3 -- Windows environment names are case-insensitive; POSIX always uses PATH */
+  const pathKey = process.platform === 'win32'
+    ? Object.keys(env).find(key => key.toUpperCase() === 'PATH') ?? 'Path'
+    : 'PATH'
   env[pathKey] = effectiveChildPath()
   return env
 }
 
 const STANDARD_USER_TOOL_PATHS = [join(homedir(), '.cargo', 'bin'), join(homedir(), '.local', 'bin')]
+/* v8 ignore next 3 -- each host runs exactly one platform arm */
 const STANDARD_HOST_TOOL_PATHS = process.platform === 'darwin'
   ? ['/opt/homebrew/bin', '/opt/homebrew/sbin', '/usr/local/bin', '/usr/local/sbin']
   : process.platform === 'win32' ? [] : ['/usr/local/bin', '/usr/local/sbin']
+/* v8 ignore next -- the Windows fallback differs from the POSIX base search path */
+const DEFAULT_CHILD_PATH = process.platform === 'win32' ? [] : ['/usr/bin', '/bin']
+
+/**
+ * Compare two PATH entries after dropping a trailing separator and, on Windows, case.
+ * @param entry - one PATH entry as the parent or a standard directory supplied it.
+ * @returns a key that treats equivalent spellings of one directory as equal.
+ */
+function pathEntryKey(entry: string): string {
+  const trimmed = entry.length > 1 ? entry.replace(/[\\/]+$/, '') : entry
+  /* v8 ignore next -- Windows PATH comparison is case-insensitive */
+  return process.platform === 'win32' ? trimmed.toLowerCase() : trimmed
+}
 
 /**
  * Build the child executable search path from the parent PATH plus conventional tool directories.
+ * A missing or empty parent PATH starts from the platform's base search path instead of dropping it.
  * @returns every inherited entry plus any standard directory the parent PATH lacks, deduplicated.
  */
 function effectiveChildPath(): string {
-  const inheritedPath = Object.entries(process.env).find(([key]) => key.toUpperCase() === 'PATH')?.[1] ?? ''
-  const entries = inheritedPath.split(delimiter).filter(entry => entry.length > 0)
+  const inheritedPath = process.env.PATH ?? ''
+  const entries = inheritedPath.length > 0 ? inheritedPath.split(delimiter) : [...DEFAULT_CHILD_PATH]
+  const seen = new Set(entries.map(pathEntryKey))
   for (const entry of [...STANDARD_USER_TOOL_PATHS, ...STANDARD_HOST_TOOL_PATHS]) {
-    if (!entries.includes(entry)) entries.push(entry)
+    const key = pathEntryKey(entry)
+    if (seen.has(key)) continue
+    seen.add(key)
+    entries.push(entry)
   }
   return entries.join(delimiter)
 }

@@ -417,6 +417,9 @@ describe('bash tool', () => {
       expect(Object.keys(schema.parameters.properties as Record<string, unknown>).slice(0, 2))
         .toEqual(['description', 'command'])
       expect(schema.parameters).toHaveProperty('required', ['command'])
+      expect(schema.description).toContain('Provide `description` before `command` in the arguments when you can')
+      expect((schema.parameters.properties as { description: { description: string } }).description.description)
+        .toContain('Optional clear, concise description')
     } finally {
       await ctx.fiber.dispose()
     }

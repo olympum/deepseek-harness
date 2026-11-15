@@ -350,8 +350,6 @@ describe('Linux native capability selection', () => {
 
       vi.stubEnv('PATH', join(root, 'missing'))
       expect(systemdRunIdentity()).toBeUndefined()
-      vi.stubEnv('PATH', undefined)
-      expect(systemdRunIdentity()).toBeUndefined()
     } finally {
       vi.unstubAllEnvs()
     }

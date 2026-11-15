@@ -106,7 +106,7 @@ PTC mode 会公开生成的 [`run_code` schema](../../../docs/tool-catalog.zh.md
 
 `run_code` takes one required argument, `code`, the body of an async TypeScript function (erasable syntax only — no `enum` or namespaces; type annotations are advisory, the code runs type-stripped), plus optional `description` metadata. The declarations below are SDK bindings for this program. A declaration does not make its name a directly callable tool; only names supplied as separate tool schemas may be called directly. When no separate `bash` schema is supplied, invoke a declared `bash` binding inside `run_code`:
 
-`run_code({ code: "inspect(await tools.bash({ description: 'Show current directory', command: 'pwd' }))", description: "Show current directory" })`
+`run_code({ code: "inspect(await tools.bash({ command: 'pwd' }))", description: "Show current directory" })`
 
 Inside the program:
 

@@ -77,7 +77,7 @@ A terminal request can opt into `shellActivity`. `inspectActivity()` combines su
 
 ### Environment every child starts from
 
-Children never inherit the harness's ambient secrets: credential-shaped names and ambient `DSH_*` facts are scrubbed, standard Cargo and local-user tool directories are appended to PATH, and the caller's explicit `env` merges after that scrub. A deliberately forwarded credential or a current `DSH_*` deployment fact still reaches the child; an explicit `undefined` tombstone removes an ordinary ambient entry.
+Children never inherit the harness's ambient secrets: credential-shaped names and ambient `DSH_*` facts are scrubbed, the standard Cargo and local-user tool directories plus the platform host tool directories (`/opt/homebrew/bin`, `/opt/homebrew/sbin`, `/usr/local/bin`, `/usr/local/sbin` on macOS; `/usr/local/bin`, `/usr/local/sbin` on other POSIX hosts) are appended to PATH without duplicating an inherited entry, and the caller's explicit `env` merges after that scrub. A deliberately forwarded credential or a current `DSH_*` deployment fact still reaches the child; an explicit `undefined` tombstone removes an ordinary ambient entry.
 
 ### What can go wrong
 

@@ -240,6 +240,14 @@ describe('spawnSubprocess', () => {
     expect(result.signal).toBeNull()
   })
 
+  it('lets an explicit PATH replace the scrubbed child PATH', async () => {
+    const result = await finish(spawnSubprocess(spec('unused', {
+      argv: [process.execPath, '-e', 'console.log(process.env.PATH ?? "")'],
+      env: { PATH: '/explicit/only' },
+    })))
+    expect(result.stdout.text.trim()).toBe('/explicit/only')
+  })
+
   it('passes the ambient TERM through untouched (terminal policy is the caller\'s)', async () => {
     const result = await finish(spawnSubprocess(spec('echo "${TERM:-unset}"', {
       env: { TERM: 'callers-choice' },

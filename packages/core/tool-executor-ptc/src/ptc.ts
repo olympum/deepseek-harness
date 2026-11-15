@@ -95,7 +95,9 @@ export function requireRuntimeLanguage(runtime: PtcRuntime): PtcRuntime {
 
 /** The shared UI-label description for the static spec and program-format-aware parameters getter. */
 const RUN_CODE_DESCRIPTION_PARAM_DESCRIPTION
-  = 'Optional clear, concise description of what this program does (shown in the UI).'
+  = 'Optional clear, concise description of what this program does in active voice, '
+    + '5-10 words (shown in the UI). Examples: "Count TODO markers across packages"; '
+    + '"Read failing test and its fixture"; "Rename config key in every cordis.yml".'
 
 const RUN_CODE_CONTROLS = {
   timeoutMs: { type: 'number', description: 'Positive elapsed-time budget in milliseconds, capped by the deployment maximum.' },
