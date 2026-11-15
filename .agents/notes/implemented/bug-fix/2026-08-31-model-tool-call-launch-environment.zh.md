@@ -12,9 +12,9 @@ Status: implemented
 
 `run_code` 和 `bash` 将 `description` 视为可选元数据。执行器仍拒绝显式提供的空描述，展示器在字段缺失时使用稳定的回退标签。
 
-agent loop 检测包含 `</tool_call>` 且至少包含一个原生参数标签的 assistant 文本。它丢弃该次尝试，并对同一步重试一次。第二个匹配响应会以明确错误结束轮次。重试预算属于单个 step，不影响提供方错误恢复。
+agent loop 检测包含 `</tool_call>` 且至少包含一个原生参数标签（`<arg_key>`、`</arg_key>` 或 `<arg_value>`）的 assistant 文本。它把丢弃的补全记录为 `assistant/attempt`，使 token 计量保留其用量，同时不进入 assistant 历史，并对同一步重试一次。第二个匹配响应会以明确错误结束轮次。重试预算属于单个 step，不影响提供方错误恢复。若 assistant 只是在散文里引用闭合标签和参数标签，就与文本编码的工具调用无法区分；第二次这样的回答仍会结束轮次，这是任务的明确边界。没有参数标签的文本编码调用按普通文本处理。
 
-`dsh-subprocess` 会把标准 Cargo、用户本地工具目录以及平台主机工具目录追加到清洗后的子进程 PATH。显式子进程环境仍可在清洗之后替换 PATH。
+`dsh-subprocess` 在父 PATH 缺失时从 `/usr/bin:/bin` 开始，然后把标准 Cargo、用户本地工具目录以及平台主机工具目录追加到清洗后的子进程 PATH。条目会去重，包括末尾分隔符。Windows 路径比较在代码中不区分大小写，但本机测试未覆盖。显式子进程环境仍可在清洗之后替换 PATH。
 
 API gateway 已经拥有可配置的 WebSocket heartbeat，subagent runtime 已经传递角色专属的 reasoning effort。本变更保留这些实现及其测试，不增加重复路径。
 

@@ -12,9 +12,9 @@ Model-generated `run_code` and `bash` calls can omit the UI-only `description` f
 
 `run_code` and `bash` treat `description` as optional metadata. Their executors still reject an explicitly supplied empty description, and their presenters use a stable fallback label when the field is absent.
 
-The agent loop detects assistant text containing `</tool_call>` and at least one native argument tag. It discards that attempt and retries the same step once. A second matching response closes the turn with an explicit error. The retry budget belongs to one step and does not affect provider error recovery.
+The agent loop detects assistant text containing `</tool_call>` and at least one native argument tag (`<arg_key>`, `</arg_key>`, or `<arg_value>`). It records the discarded completion as an `assistant/attempt` so token accounting keeps its usage, keeps it out of assistant history, and retries the same step once. A second matching response closes the turn with an explicit error. The retry budget belongs to one step and does not affect provider error recovery. An assistant answer that quotes both a closing tag and an argument tag as prose is indistinguishable from a text-encoded call; a second such answer still fails the turn, which is the task's explicit bound. A text-encoded call without an argument tag is ordinary text.
 
-`dsh-subprocess` appends the standard Cargo and local-user tool directories, plus platform host tool directories, to the scrubbed child PATH. An explicit child environment can still replace PATH after the scrub.
+`dsh-subprocess` starts from `/usr/bin:/bin` when the parent PATH is absent, then appends the standard Cargo and local-user tool directories plus platform host tool directories to the scrubbed child PATH. Entries are deduplicated, including a trailing separator. Windows path comparison is case-insensitive in the code but is not exercised by this host's tests. An explicit child environment can still replace PATH after the scrub.
 
 The API gateway already owns the configurable WebSocket heartbeat, and the subagent runtime already carries role-specific reasoning effort. This change preserves those implementations without adding duplicate paths.
 

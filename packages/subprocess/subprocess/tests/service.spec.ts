@@ -18,6 +18,7 @@ import type {
  * is all an implementation owes the abstract class.
  */
 class StubSubprocessRuntime extends SubprocessRuntime {
+  async terminalEnvironment() { return { platform: 'posix' as const } }
   async resolveExecutable(command: string): Promise<string> {
     return `/bin/${command}`
   }
@@ -28,7 +29,7 @@ class StubSubprocessRuntime extends SubprocessRuntime {
       ? { stdout: { readFrom: () => read } }
       : {}
     return {
-      pid: spec.argv.length,
+      control: undefined,
       stdin: undefined,
       stdout: undefined,
       stderr: undefined,
@@ -45,6 +46,8 @@ class StubSubprocessRuntime extends SubprocessRuntime {
       output: new PassThrough(),
       done: Promise.resolve({ exitCode: 0, signal: null }),
       write: async () => {},
+      resize: async () => {},
+      inspectActivity: async () => ({ state: 'unknown' as const, revision: 0 }),
       inspectForeground: async () => ({ processGroupId: 1, inputWaiting: true }),
       signalForeground: async () => 1,
       terminate: async () => {},
@@ -62,7 +65,7 @@ describe('SubprocessRuntime seam', () => {
       stdio: { stdin: 'ignore', stdout: { maxBytes: 1 }, stderr: 'inherit' },
       graceMs: 1,
     })
-    expect(handle.pid).toBe(1)
+    expect(Object.hasOwn(handle, 'pid')).toBe(false)
     expect(handle.collected.stdout!.readFrom(0)).toEqual({ text: '', nextOffset: 0, lossy: false })
     handle.terminate()
     await expect(handle.waitForExit()).resolves.toBe(true)
@@ -100,16 +103,69 @@ describe('SubprocessRuntime seam', () => {
     }
   })
 
-  it('adds the Cargo bin to a sparse launchd PATH', () => {
+  it('appends every standard tool directory after a sparse launchd PATH', () => {
     const originalPath = process.env.PATH
     process.env.PATH = '/usr/bin:/bin'
     try {
       const env = scrubbedParentEnv()
-      const path = Object.entries(env).find(([key]) => key.toUpperCase() === 'PATH')?.[1]
-      expect(path?.split(delimiter)).toContain(join(homedir(), '.cargo', 'bin'))
+      const entries = env.PATH!.split(delimiter)
+      const standard = [
+        join(homedir(), '.cargo', 'bin'),
+        join(homedir(), '.local', 'bin'),
+        ...process.platform === 'darwin'
+          ? ['/opt/homebrew/bin', '/opt/homebrew/sbin', '/usr/local/bin', '/usr/local/sbin']
+          : process.platform === 'win32' ? [] : ['/usr/local/bin', '/usr/local/sbin'],
+      ]
+      expect(entries.slice(0, 2)).toEqual(['/usr/bin', '/bin'])
+      for (const directory of standard) expect(entries).toContain(directory)
+      expect(new Set(entries).size).toBe(entries.length)
     } finally {
       if (originalPath === undefined) delete process.env.PATH
       else process.env.PATH = originalPath
+    }
+  })
+
+  it('keeps the platform base search path when the parent PATH is absent', () => {
+    const originalPath = process.env.PATH
+    delete process.env.PATH
+    try {
+      const entries = scrubbedParentEnv().PATH!.split(delimiter)
+      expect(entries).toContain(join(homedir(), '.cargo', 'bin'))
+      if (process.platform !== 'win32') expect(entries.slice(0, 2)).toEqual(['/usr/bin', '/bin'])
+    } finally {
+      if (originalPath === undefined) delete process.env.PATH
+      else process.env.PATH = originalPath
+    }
+  })
+
+  it('treats a standard directory with a trailing separator as already present', () => {
+    const originalPath = process.env.PATH
+    process.env.PATH = `${join(homedir(), '.cargo', 'bin')}/:/usr/bin:/`
+    try {
+      const entries = scrubbedParentEnv().PATH!.split(delimiter)
+      const cargo = entries.filter(entry => entry.replace(/[\\/]+$/, '') === join(homedir(), '.cargo', 'bin'))
+      expect(cargo).toHaveLength(1)
+      expect(entries).toContain('/usr/local/bin')
+    } finally {
+      if (originalPath === undefined) delete process.env.PATH
+      else process.env.PATH = originalPath
+    }
+  })
+
+  it.skipIf(process.platform === 'win32')('creates uppercase PATH on POSIX even when only a lowercase path is present', () => {
+    const originalPath = process.env.PATH
+    const originalLower = process.env.path
+    delete process.env.PATH
+    process.env.path = '/usr/bin'
+    try {
+      const env = scrubbedParentEnv()
+      expect(env.path).toBe('/usr/bin')
+      expect(env.PATH?.split(delimiter)).toContain('/usr/bin')
+    } finally {
+      if (originalPath === undefined) delete process.env.PATH
+      else process.env.PATH = originalPath
+      if (originalLower === undefined) delete process.env.path
+      else process.env.path = originalLower
     }
   })
 })
