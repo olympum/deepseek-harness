@@ -198,7 +198,7 @@ describe('Computer Use MCP composition', () => {
     expect(listed.tools[1]).toMatchObject({
       name: registered.name, description: registered.description, inputSchema: { ...schema, properties: served },
     })
-    expect(registered.parameters).toMatchObject({ required: expect.arrayContaining(['code']) as string[] })
+    expect(registered.parameters).toMatchObject({ required: ['code'] })
     expect(registered.description.length).toBeGreaterThan(1000)
 
     // The reference is the provider's guidance for the connection Agent, served before any program has run.

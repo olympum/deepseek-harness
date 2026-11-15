@@ -12,6 +12,8 @@ import { defineContentToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import AgentRegistry, { type Agent, type AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
 
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
+import { deriveTurnTokenUsage } from '@deepseek-ai/dsh-token-meter/client'
+import { tokenUsageProjectionDefinition } from '@deepseek-ai/dsh-token-meter/src/usage-projection.ts'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { MockAdapter, maxTokensResponse, textResponse, toolCallResponse } from './mock-adapter.ts'
 
@@ -499,11 +501,44 @@ describe('agent loop', () => {
     await waitForIdle(ctx, agent)
 
     expect(adapter.requests).toHaveLength(2)
-    expect(agent.session.snapshotEvents().filter(event => event.type === 'assistant/message')).toHaveLength(1)
+    const events = agent.session.snapshotEvents()
+    expect(events.filter(event => event.type === 'assistant/message')).toHaveLength(1)
     // The discarded completion is still a durable attempt, so token accounting keeps its usage.
-    expect(agent.session.snapshotEvents().filter(event => event.type === 'assistant/attempt')).toHaveLength(1)
+    expect(events.filter(event => event.type === 'assistant/attempt')).toHaveLength(1)
+    expect(events.filter(event => event.type === 'llm/retry')).toHaveLength(1)
+    expect(events.filter(event => event.type === 'llm/retry-started')).toHaveLength(1)
     const messages = agent.session.deriveMessages()
     expect(messages.at(-1)?.content).toEqual([{ type: 'text', text: 'recovered' }])
+  })
+
+  it('keeps both attempts in token accounting across the malformed retry', async () => {
+    const malformed = '<tool_call><arg_key>name</arg_key><arg_value>bash</arg_value></tool_call>'
+    const withUsage = (
+      text: string,
+      usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number },
+    ) => textResponse(text).map(chunk => chunk.type === 'usage' ? { ...chunk, usage } : chunk)
+    const adapter = new MockAdapter([
+      withUsage(malformed, { inputTokens: 100, outputTokens: 20, cacheReadTokens: 0, cacheWriteTokens: 0 }),
+      withUsage('recovered', { inputTokens: 120, outputTokens: 5, cacheReadTokens: 0, cacheWriteTokens: 0 }),
+    ])
+    const ctx = await harness(adapter)
+    const agent = await ctx.agentLoop.create(brandString<SessionId>('text-tool-usage'), { provider: 'mock', model: 'mock' })
+
+    send(agent, 'recover the malformed call')
+    await waitForIdle(ctx, agent)
+
+    const events = agent.session.snapshotEvents()
+    const turnStart = events.findIndex(event => event.type === 'turn/start')
+    const turnEnd = events.findLastIndex(event => event.type === 'turn/end')
+    const turnEvents = events.slice(turnStart, turnEnd + 1)
+    const expected = {
+      uncachedInputTokens: 220,
+      outputTokens: 25,
+    }
+    expect(deriveTurnTokenUsage(turnEvents)).toMatchObject(expected)
+    let state = tokenUsageProjectionDefinition.init() as ReturnType<typeof tokenUsageProjectionDefinition.apply>
+    for (const event of events) state = tokenUsageProjectionDefinition.apply(state, event)
+    expect(state.totals).toMatchObject(expected)
   })
 
   it.each([
@@ -546,6 +581,8 @@ describe('agent loop', () => {
 
     expect(adapter.requests).toHaveLength(2)
     expect(agent.session.snapshotEvents().filter(event => event.type === 'assistant/message')).toHaveLength(0)
+    // Both malformed completions are durable attempts; only the second one is followed by the error.
+    expect(agent.session.snapshotEvents().filter(event => event.type === 'assistant/attempt')).toHaveLength(2)
     expect(agent.session.snapshotEvents().find(event => event.type === 'turn/end')).toMatchObject({
       type: 'turn/end',
       data: { reason: { kind: 'error', error: { message: 'agent-loop: model emitted a text-encoded native tool call twice' } } },

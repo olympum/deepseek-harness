@@ -350,6 +350,11 @@ describe('Linux native capability selection', () => {
 
       vi.stubEnv('PATH', join(root, 'missing'))
       expect(systemdRunIdentity()).toBeUndefined()
+      vi.stubEnv('PATH', undefined)
+      // childEnv starts from /usr/bin:/bin when the parent PATH is absent.
+      const fallback = systemdRunIdentity()
+      if (existsSync('/usr/bin/systemd-run')) expect(fallback).toBeDefined()
+      else expect(fallback).toBeUndefined()
     } finally {
       vi.unstubAllEnvs()
     }

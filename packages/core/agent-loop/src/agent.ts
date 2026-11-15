@@ -19,6 +19,7 @@ import type {
   RequestErrorAction,
 } from '@deepseek-ai/dsh-agent'
 import { AgentModel, agentEvents, assembleContextFor } from '@deepseek-ai/dsh-agent'
+import { brandString } from '@deepseek-ai/dsh-brand'
 import type { GenerateOptions, LlmCallConfig, Message, PreparedLlmCall } from '@deepseek-ai/dsh-llm'
 import {
   LlmError,
@@ -37,6 +38,7 @@ import type { PromptAssembly } from '@deepseek-ai/dsh-system-prompt'
 import { ToolActivationError, ToolBatchExecutionError } from '@deepseek-ai/dsh-tools'
 import type { ResolvedToolSet } from '@deepseek-ai/dsh-tools'
 import type { Context } from '@deepseek-ai/cordis'
+import type { RetryId } from '@deepseek-ai/dsh-llm-retry'
 import { ReactLoopInbox } from './inbox.ts'
 import { RuntimeContextProjection } from './runtime-context.ts'
 import { AssistantStreamAttempt } from './assistant-stream.ts'
@@ -587,11 +589,27 @@ export class ReactLoopAgent implements Agent {
             || malformedToolText.includes('</arg_key>')
             || malformedToolText.includes('<arg_value>'))
         if (malformedToolCall) {
+          live.settle('assistant/attempt', () => this.session.append('assistant/attempt', {
+            turn, step, stream: live.stream,
+          }).seq)
           if (malformedToolCallRetries < 1) {
             malformedToolCallRetries += 1
-            live.settle('assistant/attempt', () => this.session.append('assistant/attempt', {
-              turn, step, stream: live.stream,
-            }).seq)
+            const retryId = brandString<RetryId>(`${this.session.id}:${turn}:${step}:text-tool-call:${malformedToolCallRetries}`)
+            this.session.append('llm/retry', {
+              retryId,
+              turn,
+              step,
+              provider: request.provider,
+              mode: 'always',
+              policyKey: 'agent-loop:text-encoded-tool-call',
+              retry: malformedToolCallRetries,
+              delayMs: 0,
+              failure: {
+                message: 'agent-loop: model emitted a text-encoded native tool call',
+                code: 'MALFORMED_TOOL_CALL',
+              },
+            })
+            this.session.append('llm/retry-started', { retryId, turn, step, retry: malformedToolCallRetries })
             continue
           }
           throw new Error('agent-loop: model emitted a text-encoded native tool call twice')
